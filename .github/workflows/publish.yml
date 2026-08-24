@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -21,3 +24,10 @@ jobs:
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Create GitHub Release with npm tarball
+        run: |
+          npm pack
+          gh release create "$GITHUB_REF_NAME" --title "kimi-webbridge-dsh $GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" kimi-webbridge-dsh-*.tgz
+        env:
+          GH_TOKEN: ${{ github.token }}
