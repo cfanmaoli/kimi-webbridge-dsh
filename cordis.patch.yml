@@ -1,0 +1,7 @@
+# kimi-webbridge-dsh bundle patch: applied automatically by the dsh profile
+# loader once this package is registered as a bundle via
+#   dsh plugin --profile <name> add kimi-webbridge-dsh
+# No manual cordis.patch.yml editing is required.
+- insert:
+    - id: kimi-webbridge
+      name: kimi-webbridge-dsh

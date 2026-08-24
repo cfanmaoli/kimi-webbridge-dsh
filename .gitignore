@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# npm tarballs and logs
+*.tgz
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
