@@ -1,7 +1,7 @@
 {
   "name": "kimi-webbridge-dsh",
   "description": "Kimi WebBridge plugin for dsh: drive the user's real browser (their login sessions) through the local kimi-webbridge daemon at 127.0.0.1:10086. Registers a single kimi_webbridge tool covering navigate, click, fill, snapshot, screenshot, evaluate, cdp, network, upload, save_as_pdf, tab and session management.",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "license": "MIT",
   "type": "module",
   "keywords": [

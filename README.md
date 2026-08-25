@@ -18,6 +18,20 @@ Kimi WebBridge 的 dsh 插件：通过本机 kimi-webbridge 守护进程（`127.
 - **浏览器扩展**：需安装并连接 Kimi WebBridge 浏览器扩展 —— 从 [Chrome Web Store](https://chromewebstore.google.com/detail/kimi-webbridge/fldmhceldgbpfpkbgopacenieobmligc) 安装（`kimi-webbridge status` 显示 `extension_connected: true`；扩展版本应与守护进程一致）。
 - **守护进程**：无需预装。插件在守护进程不可达时会自动启动它；二进制缺失时会自动从官方 CDN（cdn.kimi.com，与官方安装器同源）下载安装——全程无需手动运行任何安装命令。
 
+### 跨平台支持
+
+插件根据运行时硬件自动选择并下载对应的守护进程二进制（含 SHA-256 校验，与官方清单核对后才安装）：
+
+| 平台 | 二进制 | 存档哈希（v1.11.6） |
+|---|---|---|
+| Windows x64 | `windows-amd64.exe` | `e085991e…90520` |
+| macOS arm64 | `darwin-arm64` | `46fe401e…c9930` |
+| macOS x64 | `darwin-amd64` | `edd1b126…e1ec54` |
+| Linux arm64 | `linux-arm64` | `b1b139bf…b7923d` |
+| Linux x64 | `linux-amd64` | `5c6eaf79…0150d` |
+
+不支持的平台组合会明确报错并提示手动安装。
+
 ## 安装（一次性，零手工配置）
 
 ```powershell
