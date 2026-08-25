@@ -80,7 +80,7 @@ dsh web
 | `baseUrl` | `http://127.0.0.1:10086` | 守护进程地址 |
 | `requestTimeoutMs` | `120000` | 单次请求超时（毫秒） |
 | `autoStartDaemon` | `true` | 守护进程未运行时自动启动 |
-| `autoInstallDaemon` | `true` | 二进制缺失时自动从官方 CDN 下载安装（关闭后需手动运行 `irm https://cdn.kimi.com/webbridge/install.ps1 | iex`） |
+| `autoInstallDaemon` | `true` | 二进制缺失时自动从官方 CDN 下载安装（关闭后需手动[从官方安装](https://www.kimi.ai/products/kimi-webbridge)） |
 | `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `0.3.0`） |
 
 ## 移除
