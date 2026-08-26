@@ -1,6 +1,18 @@
 # kimi-webbridge-dsh
 
-Kimi WebBridge 的 dsh 插件：通过本机 kimi-webbridge 守护进程（`127.0.0.1:10086`）驱动用户的真实浏览器（保留登录态与 Cookie）。注册一个模型工具 `kimi_webbridge`，覆盖导航、点击、输入、读取页面（accessibility tree + @e 引用）、截图、JS 求值、CDP、网络、上传、PDF 导出、标签页与会话管理。
+Kimi WebBridge 的 dsh 插件（**基础设施 + 技能生成**）。插件本身不代理浏览器操作，而是负责：
+
+1. **保障桥完好**：守护进程二进制缺失时自动从官方 CDN 下载（跨平台、SHA-256 校验），守护进程未运行时自动拉起；
+2. **生成 skill**：启动时把随包内置的 `skill.md` 同步到 `~/.dsh/skills/kimi-webbridge/SKILL.md`，模型通过 `skill` 工具加载它，按文档用 HTTP 行使全部浏览器能力（17 个动作）；
+3. **注册一个瘦工具 `kimi_webbridge`**：只有 `status` 一个动作（守护进程 + 扩展健康检查），作为其他 skill（如 x-cli 系列）的桥健康锚点。
+
+## 架构
+
+| 层 | 角色 |
+|---|---|
+| 插件（本包） | 守护进程二进制供应 + 自动启动；apply() 时同步 skill 文件 |
+| skill（`~/.dsh/skills/kimi-webbridge/SKILL.md`） | 模型经 `skill` 工具加载，按文档驱动守护进程：navigate / find_tab / snapshot / click / mouse_click / fill / key_type / send_keys / evaluate / cdp / screenshot / network / upload / save_as_pdf / list_tabs / close_tab / close_session |
+| 瘦工具 `kimi_webbridge` | 仅 `status` 健康检查（自带守护进程自愈） |
 
 ## 安装（一次性，零手工配置）
 
@@ -8,24 +20,17 @@ Kimi WebBridge 的 dsh 插件：通过本机 kimi-webbridge 守护进程（`127.
 dsh plugin --profile web add kimi-webbridge-dsh
 ```
 
-本包声明了 `dsh.bundle.patch`：`dsh plugin add` 会自动把它登记进 profile 的 bundle 层（`dsh.profile.bundles`），**无需手动编辑任何 cordis.patch.yml**。安装后重启一次 dsh web 即生效（bundle 在启动时加载）：
+本包声明了 `dsh.bundle.patch`：`dsh plugin add` 会自动把它登记进 profile 的 bundle 层（`dsh.profile.bundles`），**无需手动编辑任何 cordis.patch.yml**。重启一次 `dsh web`：启动时插件同步 skill 文件，新会话的 skill 目录中即出现 `kimi-webbridge`。
 
-```powershell
-dsh web
-```
+## 用法（模型视角）
 
-## 用法
-
-模型在新会话中可直接调用 `kimi_webbridge` 工具。核心规则：
-
-- **一个任务 = 一个 session = 一个标签页组**：任务开始时选一个 session 名，之后每次调用都带上（如 `camping-research`）。
-- **读页面用 snapshot**：返回 accessibility tree 和 `@e` 引用，点击/输入优先用 `@e` 引用而非手写 CSS。
-- **截图返回文件路径**：用 read 工具打开查看。
-- **守护进程不可达**：工具会自动启动；二进制缺失时自动从官方 CDN 下载安装。
+1. 需要真实浏览器时，加载 `kimi-webbridge` skill（触发词：browser / webpage / open URL / 浏览器 / 网页 / 截图……）；
+2. 先用 `kimi_webbridge` 工具的 `status` 确认守护进程 + 扩展健康（插件自动补装/拉起二进制）；
+3. 按 skill 文档向 `POST http://127.0.0.1:10086/command` 发送 `{action, args, session}` 行使浏览器能力。Windows 上必须用临时文件承载 JSON（shell 会破坏非 ASCII 文本），skill 里有完整说明。
 
 ## 依赖
 
-- **浏览器扩展**：需安装并连接 Kimi WebBridge 浏览器扩展 —— 从 [Chrome Web Store](https://chromewebstore.google.com/detail/kimi-webbridge/fldmhceldgbpfpkbgopacenieobmligc) 安装（`kimi-webbridge status` 显示 `extension_connected: true`；扩展版本应与守护进程一致）。
+- **浏览器扩展**：需安装并连接 Kimi WebBridge 浏览器扩展 —— 从 [Chrome Web Store](https://chromewebstore.google.com/detail/kimi-webbridge/fldmhceldgbpfpkbgopacenieobmligc) 安装（`kimi_webbridge status` 显示 `extension_connected: true`；扩展版本应与守护进程一致）。
 - **守护进程**：无需预装。插件在守护进程不可达时会自动启动它；二进制缺失时会自动从官方 CDN（cdn.kimi.com，与官方安装器同源）下载安装——全程无需手动运行任何安装命令。
 
 ### 跨平台支持
@@ -53,15 +58,16 @@ dsh web
 
 下载流程：先落盘为临时文件（`kimi-webbridge(.exe).tmp-{pid}-{时间戳}`）→ SHA-256 与官方清单核对 → 匹配才重命名为最终路径；不匹配则删除临时文件并中止，任何未验证的二进制都不会留在磁盘。该路径与官方安装器 / `kimi-webbridge upgrade` 命令完全一致，插件、官方工具共用同一份守护进程。
 
-## 功能
+## 功能（skill 承载，17 个动作）
 
-| 能力 | 说明 |
+| 能力 | 动作 |
 |---|---|
-| 浏览真实页面 | 在用户已登录的浏览器中导航、点击、填表、滚动 |
-| 读页面 | `snapshot` 返回 accessibility tree 与 `@e` 元素引用 |
-| 截图 / 导出 PDF | 结果写入本地文件，返回路径 |
-| JS 求值 / CDP | `evaluate`（页面上下文）、`cdp`（chrome.debugger 直通） |
-| 网络 / 上传 | 请求捕获与文件上传 |
+| 导航 / 标签 | `navigate`、`find_tab`、`list_tabs`、`close_tab`、`close_session` |
+| 读页面 | `snapshot`（accessibility tree + `@e` 引用） |
+| 点击 / 输入 | `click`、`mouse_click`（真实鼠标，可信输入）、`fill`、`key_type`（键入，可信）、`send_keys`（组合键） |
+| JS / CDP | `evaluate`（页面上下文）、`cdp`（chrome.debugger 直通） |
+| 截图 / PDF | `screenshot`、`save_as_pdf`（写文件、返回路径） |
+| 网络 / 上传 | `network`（请求捕获）、`upload`（文件上传） |
 | 会话分组 | 一个任务 = 一个 session = 一个标签页组，可一键清理 |
 
 ## 配置（可选）
@@ -82,6 +88,7 @@ dsh web
 | `autoStartDaemon` | `true` | 守护进程未运行时自动启动 |
 | `autoInstallDaemon` | `true` | 二进制缺失时自动从官方 CDN 下载安装（关闭后需手动[从官方安装](https://www.kimi.ai/products/kimi-webbridge)） |
 | `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `0.3.0`） |
+| `generateSkill` | `true` | 启动时同步 `kimi-webbridge` skill 文件（关闭后不生成/更新） |
 
 ## 移除
 
@@ -89,4 +96,4 @@ dsh web
 dsh plugin --profile web remove kimi-webbridge-dsh
 ```
 
-自动从 bundle 层移除（无需手动删补丁行），重启后生效。
+自动从 bundle 层移除（无需手动删补丁行），重启后生效。skill 文件（`~/.dsh/skills/kimi-webbridge/`）如需一并删除可手动清理。

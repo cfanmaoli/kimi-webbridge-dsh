@@ -1,7 +1,7 @@
 {
   "name": "kimi-webbridge-dsh",
-  "description": "Kimi WebBridge plugin for dsh: drive the user's real browser (their login sessions) through the local kimi-webbridge daemon at 127.0.0.1:10086. Registers a single kimi_webbridge tool covering navigate, click, fill, snapshot, screenshot, evaluate, cdp, network, upload, save_as_pdf, tab and session management.",
-  "version": "1.4.1",
+  "description": "Infrastructure plugin for dsh: provisions the kimi-webbridge daemon (auto-install with SHA-256 verification, auto-start) and generates the kimi-webbridge skill that documents the full 17-action browser protocol. Registers a thin kimi_webbridge tool (status health check only).",
+  "version": "1.4.5",
   "license": "MIT",
   "type": "module",
   "keywords": [
@@ -31,14 +31,13 @@
   },
   "files": [
     "lib/index.js",
+    "skill.md",
     "README.md",
     "cordis.patch.yml"
   ],
   "peerDependencies": {
-    "@deepseek-ai/dsh-tools": ">=0.1.0-rc.7 <0.2.0",
-    "@deepseek-ai/dsh-llm": ">=0.1.0-rc.7 <0.2.0"
-  },
-  "dependencies": {
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7 || ^0.1.1-rc.2",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.7 || ^0.1.1-rc.2",
     "@deepseek-ai/schemastery": "^3.18.1"
   }
 }
