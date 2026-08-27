@@ -3,7 +3,8 @@ name: publish
 on:
   push:
     tags:
-      - "v*"
+      # stable release tags only (vX.Y.Z) — prerelease/beta/rc tags do not publish
+      - "v[0-9]*.[0-9]*.[0-9]*"
 
 jobs:
   publish:
