@@ -78,7 +78,7 @@ dsh plugin --profile web add kimi-webbridge-dsh
 - id: kimi-webbridge
   config:
     autoInstallDaemon: false
-    daemonVersion: 0.3.0
+    daemonVersion: v1.11.6
 ```
 
 | 配置项 | 默认值 | 说明 |
@@ -87,7 +87,7 @@ dsh plugin --profile web add kimi-webbridge-dsh
 | `requestTimeoutMs` | `120000` | 单次请求超时（毫秒） |
 | `autoStartDaemon` | `true` | 守护进程未运行时自动启动 |
 | `autoInstallDaemon` | `true` | 二进制缺失时自动从官方 CDN 下载安装（关闭后需手动[从官方安装](https://www.kimi.ai/products/kimi-webbridge)） |
-| `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `0.3.0`） |
+| `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `v1.11.6`，需带 `v` 前缀与 CDN 路径一致） |
 | `generateSkill` | `true` | 启动时同步 `kimi-webbridge` skill 文件（关闭后不生成/更新） |
 
 ## 移除
