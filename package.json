@@ -1,7 +1,7 @@
 {
   "name": "kimi-webbridge-dsh",
-  "description": "Infrastructure plugin for dsh: provisions the kimi-webbridge daemon (auto-install with SHA-256 verification, auto-start) and generates the kimi-webbridge skill that documents the full 17-action browser protocol. Registers a thin kimi_webbridge tool (status health check only).",
-  "version": "1.4.5",
+  "description": "Infrastructure plugin for dsh: provisions the kimi-webbridge daemon (auto-install with SHA-256 verification, auto-start) and registers the kimi-webbridge skill that documents the full 17-action browser protocol. Registers a thin kimi_webbridge tool (status health check only).",
+  "version": "1.4.6",
   "license": "MIT",
   "type": "module",
   "keywords": [

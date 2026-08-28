@@ -1,17 +1,17 @@
 # kimi-webbridge-dsh
 
-Kimi WebBridge 的 dsh 插件（**基础设施 + 技能生成**）。插件本身不代理浏览器操作，而是负责：
+Kimi WebBridge 的 dsh 插件（**基础设施 + 技能注册**）。插件本身不代理浏览器操作，而是负责：
 
 1. **保障桥完好**：守护进程二进制缺失时自动从官方 CDN 下载（跨平台、SHA-256 校验），守护进程未运行时自动拉起；
-2. **生成 skill**：启动时把随包内置的 `skill.md` 同步到 `~/.dsh/skills/kimi-webbridge/SKILL.md`，模型通过 `skill` 工具加载它，按文档用 HTTP 行使全部浏览器能力（17 个动作）；
+2. **注册 skill**：启动时把随包内置的 `skill.md` 注册为运行时 skill（`ctx.skills.register`，`source: bundled`），模型通过 `skill` 工具加载它，按文档用 HTTP 行使全部浏览器能力（17 个动作）；
 3. **注册一个瘦工具 `kimi_webbridge`**：只有 `status` 一个动作（守护进程 + 扩展健康检查），作为其他 skill（如 x-cli 系列）的桥健康锚点。
 
 ## 架构
 
 | 层 | 角色 |
 |---|---|
-| 插件（本包） | 守护进程二进制供应 + 自动启动；apply() 时同步 skill 文件 |
-| skill（`~/.dsh/skills/kimi-webbridge/SKILL.md`） | 模型经 `skill` 工具加载，按文档驱动守护进程：navigate / find_tab / snapshot / click / mouse_click / fill / key_type / send_keys / evaluate / cdp / screenshot / network / upload / save_as_pdf / list_tabs / close_tab / close_session |
+| 插件（本包） | 守护进程二进制供应 + 自动启动；apply() 时注册运行时 skill |
+| skill（运行时注册，随包内置 `skill.md`） | 模型经 `skill` 工具加载，按文档驱动守护进程：navigate / find_tab / snapshot / click / mouse_click / fill / key_type / send_keys / evaluate / cdp / screenshot / network / upload / save_as_pdf / list_tabs / close_tab / close_session |
 | 瘦工具 `kimi_webbridge` | 仅 `status` 健康检查（自带守护进程自愈） |
 
 ## 安装（一次性，零手工配置）
@@ -20,7 +20,7 @@ Kimi WebBridge 的 dsh 插件（**基础设施 + 技能生成**）。插件本�
 dsh plugin --profile web add kimi-webbridge-dsh
 ```
 
-本包声明了 `dsh.bundle.patch`：`dsh plugin add` 会自动把它登记进 profile 的 bundle 层（`dsh.profile.bundles`），**无需手动编辑任何 cordis.patch.yml**。重启一次 `dsh web`：启动时插件同步 skill 文件，新会话的 skill 目录中即出现 `kimi-webbridge`。
+本包声明了 `dsh.bundle.patch`：`dsh plugin add` 会自动把它登记进 profile 的 bundle 层（`dsh.profile.bundles`），**无需手动编辑任何 cordis.patch.yml**。重启一次 `dsh web`：启动时插件把 skill 注册进运行时 registry，新会话的 skill 目录中即出现 `kimi-webbridge`。
 
 ## 用法（模型视角）
 
@@ -88,7 +88,7 @@ dsh plugin --profile web add kimi-webbridge-dsh
 | `autoStartDaemon` | `true` | 守护进程未运行时自动启动 |
 | `autoInstallDaemon` | `true` | 二进制缺失时自动从官方 CDN 下载安装（关闭后需手动[从官方安装](https://www.kimi.ai/products/kimi-webbridge)） |
 | `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `v1.11.6`，需带 `v` 前缀与 CDN 路径一致） |
-| `generateSkill` | `true` | 启动时同步 `kimi-webbridge` skill 文件（关闭后不生成/更新） |
+| `registerSkill` | `true` | 启动时把 `kimi-webbridge` skill 注册进运行时 registry（关闭后不注册） |
 
 ## 移除
 
@@ -96,4 +96,4 @@ dsh plugin --profile web add kimi-webbridge-dsh
 dsh plugin --profile web remove kimi-webbridge-dsh
 ```
 
-自动从 bundle 层移除（无需手动删补丁行），重启后生效。skill 文件（`~/.dsh/skills/kimi-webbridge/`）如需一并删除可手动清理。
+自动从 bundle 层移除（无需手动删补丁行），重启后生效。skill 为运行时注册，移除插件即随之消失，无残留文件。
