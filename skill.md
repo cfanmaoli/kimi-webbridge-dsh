@@ -73,6 +73,7 @@ Call `close_session` only when the user explicitly asks to close the tabs.
 - Call the `kimi_webbridge` tool (`status`) — the plugin auto-provisions and starts the daemon. Never run `stop` / `restart` / `uninstall` yourself.
 - If an error mentions "Please update the Kimi WebBridge extension", the extension is outdated — ask the user to update it (https://www.kimi.com/features/webbridge).
 - If the daemon stays unreachable after the status tool's retry, point the user to the help page instead of deep-troubleshooting.
+- If the status tool warns that `version` (daemon) and `extension_version` (extension) differ, the extension has drifted (likely auto-updated) — re-audit the 17-action list above and ask the user to update the daemon.
 
 ---
 
