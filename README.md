@@ -37,13 +37,13 @@ dsh plugin --profile web add kimi-webbridge-dsh
 
 插件根据运行时硬件自动选择并下载对应的守护进程二进制（含 SHA-256 校验，与官方清单核对后才安装）：
 
-| 平台 | 二进制 | 存档哈希（v1.11.6） |
+| 平台 | 二进制 | 存档哈希（v2.0.3） |
 |---|---|---|
-| Windows x64 | `windows-amd64.exe` | `e085991e…90520` |
-| macOS arm64 | `darwin-arm64` | `46fe401e…c9930` |
-| macOS x64 | `darwin-amd64` | `edd1b126…e1ec54` |
-| Linux arm64 | `linux-arm64` | `b1b139bf…b7923d` |
-| Linux x64 | `linux-amd64` | `5c6eaf79…0150d` |
+| Windows x64 | `windows-amd64.exe` | `d29568ab…1dfa9` |
+| macOS arm64 | `darwin-arm64` | `ef641f74…ddf5a` |
+| macOS x64 | `darwin-amd64` | `f7f56444…7a436` |
+| Linux arm64 | `linux-arm64` | `9ccfd0c4…66413` |
+| Linux x64 | `linux-amd64` | `53bc057f…fce79` |
 
 不支持的平台组合会明确报错并提示手动安装。
 
@@ -79,7 +79,7 @@ dsh plugin --profile web add kimi-webbridge-dsh
 - id: kimi-webbridge
   config:
     autoInstallDaemon: false
-    daemonVersion: v1.11.6
+    daemonVersion: v2.0.3
 ```
 
 | 配置项 | 默认值 | 说明 |
@@ -88,7 +88,7 @@ dsh plugin --profile web add kimi-webbridge-dsh
 | `requestTimeoutMs` | `120000` | 单次请求超时（毫秒） |
 | `autoStartDaemon` | `true` | 守护进程未运行时自动启动 |
 | `autoInstallDaemon` | `true` | 二进制缺失时自动从官方 CDN 下载安装（关闭后需手动[从官方安装](https://www.kimi.ai/products/kimi-webbridge)） |
-| `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `v1.11.6`，需带 `v` 前缀与 CDN 路径一致） |
+| `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `v2.0.3`，需带 `v` 前缀与 CDN 路径一致；建议与扩展版本匹配） |
 | `registerSkill` | `true` | 启动时把 `kimi-webbridge` skill 注册进运行时 registry（关闭后不注册） |
 
 ## 移除
