@@ -3,7 +3,7 @@
 Kimi WebBridge 的 dsh 插件（**基础设施 + 技能注册**）。插件本身不代理浏览器操作，而是负责：
 
 1. **保障桥完好**：守护进程二进制缺失时自动从官方 CDN 下载（跨平台、SHA-256 校验），守护进程未运行时自动拉起；
-2. **注册 skill**：启动时把随包内置的 `skill.md` 注册为运行时 skill（`ctx.skills.register`，`source: bundled`），模型通过 `skill` 工具加载它，按文档用 HTTP 行使全部浏览器能力（17 个动作）；
+2. **注册 skill**：启动时把随包内置的 `skill.md` 注册为运行时 skill（`ctx.skills.register`，`source: bundled`），模型通过 `skill` 工具加载它，按文档用 HTTP 行使全部浏览器能力（25 个动作）；
 3. **注册一个瘦工具 `kimi_webbridge`**：只有 `status` 一个动作（守护进程 + 扩展健康检查），作为其他 skill（如 x-cli 系列）的桥健康锚点。
 
 ## 架构
@@ -11,7 +11,7 @@ Kimi WebBridge 的 dsh 插件（**基础设施 + 技能注册**）。插件本�
 | 层 | 角色 |
 |---|---|
 | 插件（本包） | 守护进程二进制供应 + 自动启动；apply() 时注册运行时 skill |
-| skill（运行时注册，随包内置 `skill.md`） | 模型经 `skill` 工具加载，按文档驱动守护进程：navigate / find_tab / snapshot / click / mouse_click / fill / key_type / send_keys / evaluate / cdp / screenshot / network / upload / save_as_pdf / list_tabs / close_tab / close_session |
+| skill（运行时注册，随包内置 `skill.md`） | 模型经 `skill` 工具加载，按文档驱动守护进程：navigate / find_tab / snapshot / read_page / find / click / mouse_click / hover / drag / fill / key_type / send_keys / select_option / dialog / evaluate / cdp / screenshot / network / upload / save_as_pdf / scroll / wait / list_tabs / close_tab / close_session |
 | 瘦工具 `kimi_webbridge` | 仅 `status` 健康检查（自带守护进程自愈） |
 
 ## 安装（一次性，零手工配置）
@@ -58,16 +58,17 @@ dsh plugin --profile web add kimi-webbridge-dsh
 
 下载流程：先落盘为临时文件（`kimi-webbridge(.exe).tmp-{pid}-{时间戳}`）→ SHA-256 与官方清单核对 → 匹配才重命名为最终路径；不匹配则删除临时文件并中止，任何未验证的二进制都不会留在磁盘。该路径与官方安装器 / `kimi-webbridge upgrade` 命令完全一致，插件、官方工具共用同一份守护进程。
 
-## 功能（skill 承载，17 个动作）
+## 功能（skill 承载，25 个动作）
 
 | 能力 | 动作 |
 |---|---|
 | 导航 / 标签 | `navigate`、`find_tab`、`list_tabs`、`close_tab`、`close_session` |
-| 读页面 | `snapshot`（accessibility tree + `@e` 引用） |
-| 点击 / 输入 | `click`、`mouse_click`（真实鼠标，可信输入）、`fill`、`key_type`（键入，可信）、`send_keys`（组合键） |
+| 读页面 | `snapshot`（accessibility tree + `@e` 引用）、`read_page`（全文文本）、`find`（页面内搜索） |
+| 点击 / 输入 | `click`、`mouse_click`（真实鼠标，可信输入）、`hover`、`drag`、`fill`、`key_type`（键入，可信）、`send_keys`（组合键）、`select_option`、`dialog` |
 | JS / CDP | `evaluate`（页面上下文）、`cdp`（chrome.debugger 直通） |
 | 截图 / PDF | `screenshot`、`save_as_pdf`（写文件、返回路径） |
 | 网络 / 上传 | `network`（请求捕获）、`upload`（文件上传） |
+| 滚动 / 等待 | `scroll`（滚动/定位）、`wait`（等待文本/选择器条件） |
 | 会话分组 | 一个任务 = 一个 session = 一个标签页组，可一键清理 |
 
 ## 配置（可选）
