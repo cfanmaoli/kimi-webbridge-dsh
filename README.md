@@ -1,6 +1,6 @@
 # kimi-webbridge-dsh
 
-Kimi WebBridge 的 dsh 插件（**基础设施 + 技能注册**）。插件本身不代理浏览器操作，而是负责：
+Kimi 浏览器扩展（**Kimi Browser Extension**，原 Kimi WebBridge）的 dsh 插件（**基础设施 + 技能注册**）。插件本身不代理浏览器操作，而是负责：
 
 1. **保障桥完好**：守护进程二进制缺失时自动从官方 CDN 下载（跨平台、SHA-256 校验），守护进程未运行时自动拉起；
 2. **注册 skill**：启动时把随包内置的 `skill.md` 注册为运行时 skill（`ctx.skills.register`，`source: bundled`），模型通过 `skill` 工具加载它，按文档用 HTTP 行使全部浏览器能力（25 个动作）；
@@ -30,20 +30,38 @@ dsh plugin --profile web add kimi-webbridge-dsh
 
 ## 依赖
 
-- **浏览器扩展**：需安装并连接 Kimi WebBridge 浏览器扩展 —— 从 [Chrome Web Store](https://chromewebstore.google.com/detail/kimi-webbridge/fldmhceldgbpfpkbgopacenieobmligc) 安装（`kimi_webbridge status` 显示 `extension_connected: true`；扩展版本应与守护进程一致）。
+- **浏览器扩展**：需安装并连接 Kimi 浏览器扩展（Kimi Browser Extension，原 Kimi WebBridge）—— 从 [Chrome Web Store](https://chromewebstore.google.com/detail/kimi-webbridge/fldmhceldgbpfpkbgopacenieobmligc) 安装（`kimi_webbridge status` 显示 `extension_connected: true`；扩展版本应与守护进程一致）。
 - **守护进程**：无需预装。插件在守护进程不可达时会自动启动它；二进制缺失时会自动从官方 CDN（cdn.kimi.com，与官方安装器同源）下载安装——全程无需手动运行任何安装命令。
+
+### 版本对齐
+
+插件按官方 CDN 的 `version.json` 供应守护进程，因此始终与官方发布对齐；上表的存档哈希对应 **v2.0.8**（守护进程与扩展的产品名已更名为 Kimi Browser Extension）。
+
+`kimi_webbridge` 的 `status` 会原样透出守护进程的 `update_available`（有更新时）与 `version_mismatch`（守护进程与扩展不同步时）字段。按官方约定：这两个字段出现时**不要**自动执行 `upgrade` / `stop` / `restart` / `uninstall`（它们会杀掉正在运行的守护进程），而应把字段里的 `command` 原样交给用户执行。
+
+### 兼容性（dsh 版本）
+
+插件只 import 宿主提供的 `@deepseek-ai/*` 包，并声明为 `peerDependencies`（不打包自己的副本），所以与 dsh 版本解耦；已在 **dsh 0.1.5-rc.1** 上验证（工具注册、skill 注册、system prompt 注入、守护进程自愈均正常）。
+
+| peer | 声明范围 |
+|---|---|
+| `@deepseek-ai/dsh-tools` | `^0.1.0-rc.7 \|\| ^0.1.1-rc.2 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1` |
+| `@deepseek-ai/dsh-llm` | 同上 |
+| `@deepseek-ai/schemastery` | `^3.18.1` |
+
+⚠️ **预发布版必须逐个元组写进范围。** node-semver 只在范围里存在一个**与该版本 `major.minor.patch` 完全一致、且自身带预发布标签**的比较符时才放行预发布版；因此看起来很宽的 `>=0.0.1-rc.1 <0.2.0` 会静默排除所有预发布构建，用户会遇到 `ERESOLVE`。dsh 发布新的预发布系列（如 `0.1.6-rc.1`）时，需要同步追加一个 `|| ^<新元组>-rc.N` 分支。
 
 ### 跨平台支持
 
 插件根据运行时硬件自动选择并下载对应的守护进程二进制（含 SHA-256 校验，与官方清单核对后才安装）：
 
-| 平台 | 二进制 | 存档哈希（v2.0.5） |
+| 平台 | 二进制 | 存档哈希（v2.0.8） |
 |---|---|---|
-| Windows x64 | `windows-amd64.exe` | `2257775a…8a136` |
-| macOS arm64 | `darwin-arm64` | `30f676a0…42310` |
-| macOS x64 | `darwin-amd64` | `18b35c39…de705` |
-| Linux arm64 | `linux-arm64` | `a11d8476…bf64b` |
-| Linux x64 | `linux-amd64` | `27cccb7b…5bbd1` |
+| Windows x64 | `windows-amd64.exe` | `eec1976d…433c6` |
+| macOS arm64 | `darwin-arm64` | `04532d77…0a261` |
+| macOS x64 | `darwin-amd64` | `931769e9…8cc0c` |
+| Linux arm64 | `linux-arm64` | `ee201b44…34a3c` |
+| Linux x64 | `linux-amd64` | `61de010c…ce271` |
 
 不支持的平台组合会明确报错并提示手动安装。
 
@@ -79,7 +97,7 @@ dsh plugin --profile web add kimi-webbridge-dsh
 - id: kimi-webbridge
   config:
     autoInstallDaemon: false
-    daemonVersion: v2.0.5
+    daemonVersion: v2.0.8
 ```
 
 | 配置项 | 默认值 | 说明 |
@@ -87,8 +105,8 @@ dsh plugin --profile web add kimi-webbridge-dsh
 | `baseUrl` | `http://127.0.0.1:10086` | 守护进程地址 |
 | `requestTimeoutMs` | `120000` | 单次请求超时（毫秒） |
 | `autoStartDaemon` | `true` | 守护进程未运行时自动启动 |
-| `autoInstallDaemon` | `true` | 二进制缺失时自动从官方 CDN 下载安装（关闭后需手动[从官方安装](https://www.kimi.ai/products/kimi-webbridge)） |
-| `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `v2.0.5`，需带 `v` 前缀与 CDN 路径一致；建议与扩展版本匹配） |
+| `autoInstallDaemon` | `true` | 二进制缺失时自动从官方 CDN 下载安装（关闭后需手动[从官方安装](https://www.kimi.com/products/kimi-webbridge)） |
+| `daemonVersion` | `latest` | 自动安装时的版本（可固定如 `v2.0.8`，需带 `v` 前缀与 CDN 路径一致；建议与扩展版本匹配） |
 | `registerSkill` | `true` | 启动时把 `kimi-webbridge` skill 注册进运行时 registry（关闭后不注册） |
 
 ## 移除

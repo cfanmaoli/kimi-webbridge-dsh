@@ -1,12 +1,12 @@
-# Kimi WebBridge
+# Kimi Browser Extension (Kimi 浏览器扩展, formerly Kimi WebBridge)
 
-Control the user's real browser (their login sessions) through the local daemon at `http://127.0.0.1:10086`.
+Control the user's real browser (their login sessions) through the local daemon at `http://127.0.0.1:10086` (the default address).
 
-> This skill is registered by the `kimi-webbridge-dsh` plugin (plugin v1.4.7 / daemon v2.0.1). Do not hand-edit it.
+> This skill is registered by the `kimi-webbridge-dsh` plugin (plugin v1.4.8 / daemon v2.0.8). Do not hand-edit it.
 
 ## Health check first
 
-Before driving the browser, call the **`kimi_webbridge` tool with action `status`**. It reports daemon + extension health and auto-provisions the daemon (downloads the binary from the official Kimi CDN when missing and starts it, then retries once). `extension_connected: true` means the browser extension is ready; if false, tell the user to install/connect the Kimi WebBridge extension.
+Before driving the browser, call the **`kimi_webbridge` tool with action `status`**. It reports daemon + extension health and auto-provisions the daemon (downloads the binary from the official Kimi CDN when missing and starts it, then retries once). `extension_connected: true` means the browser extension is ready; if false, tell the user to install/connect the Kimi Browser Extension.
 
 ## The 25 actions
 
@@ -80,11 +80,12 @@ Call `close_session` only when the user explicitly asks to close the tabs.
 
 ## Daemon or extension problems
 
-- Call the `kimi_webbridge` tool (`status`) — the plugin auto-provisions and starts the daemon. Never run `stop` / `restart` / `uninstall` yourself.
-- If an error mentions "Please update the Kimi WebBridge extension", the extension is outdated — ask the user to update it (https://www.kimi.com/features/webbridge).
+- Call the `kimi_webbridge` tool (`status`) — the plugin auto-provisions and starts the daemon. Never run `stop` / `restart` / `upgrade` / `uninstall` yourself: they kill a running daemon.
+- If an error mentions "Please update the Kimi Browser Extension", the extension is outdated — ask the user to update it (https://www.kimi.com/products/kimi-webbridge).
 - If the daemon stays unreachable after the status tool's retry, point the user to the help page instead of deep-troubleshooting.
-- If the status tool warns that `version` (daemon) and `extension_version` (extension) differ, the extension has drifted (likely auto-updated) — re-audit the 25-action list above and ask the user to update the daemon.
+- When `status` reports `update_available` or `version_mismatch`, tell the user and hand them that field's `command` verbatim — that is what the field is for. Do **not** run it yourself.
+- If the status tool warns that `version` (daemon) and `extension_version` (extension) differ, one side is behind (the extension follows the browser store's schedule): if the **extension** is behind, ask the user to update it; if the **daemon** is behind, hand them the `upgrade` command. Re-audit the 25-action list above after either change.
 
 ---
 
-Protocol and workflow adapted from the Kimi WebBridge community skill (Apache-2.0). Daemon binary and browser extension by Kimi. This skill is registered by kimi-webbridge-dsh.
+Protocol and workflow adapted from the Kimi Browser Extension community skill (Apache-2.0). Daemon binary and browser extension by Kimi. This skill is registered by kimi-webbridge-dsh.
