@@ -17,7 +17,12 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: npm ci || npm install
       - name: Quick load/regression check
-        run: node --check lib/index.js
+        run: npm run check
+      # Informational: the vendored skill is pinned on purpose, so a stale copy must
+      # not block a plugin fix. The scheduled skill-drift workflow fails instead.
+      - name: Report upstream skill drift
+        continue-on-error: true
+        run: node scripts/fetch-upstream-skill.mjs --check
       - name: Publish to npm
         run: npm publish
         env:

@@ -1,0 +1,24 @@
+name: upstream skill drift
+
+# The plugin's value is tracking upstream: skill/ is vendored from the release CDN and
+# pinned by digest, so this job is what turns upstream movement into a visible failure
+# instead of silent staleness. Update with:
+#   node scripts/fetch-upstream-skill.mjs && npm run check
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      # Builtins only — no npm install needed.
+      - name: Fail when the vendored skill is behind the CDN
+        run: node scripts/fetch-upstream-skill.mjs --check
+      - name: Verify the vendored files match UPSTREAM.json
+        run: node scripts/fetch-upstream-skill.mjs --verify-local
