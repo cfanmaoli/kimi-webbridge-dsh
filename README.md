@@ -81,11 +81,11 @@ dsh plugin --profile web add kimi-webbridge-dsh
 
 ### 兼容性（dsh 版本）
 
-插件只 import 宿主提供的 `@deepseek-ai/*` 包，并声明为 `peerDependencies`（不打包自己的副本），所以与 dsh 版本解耦；已在 **dsh 0.1.5-rc.1** 上验证（工具注册、skill 注册、system prompt 注入、守护进程自愈均正常）。技能注册走 `ctx.skills.register`（运行时技能），并额外传入 `resourceBase: { kind: "directory", path: <skill 目录> }`——宿主会把该目录作为 skill 的基准目录渲染给模型。
+插件只 import 宿主提供的 `@deepseek-ai/*` 包，并声明为 `peerDependencies`（不打包自己的副本），所以与 dsh 版本解耦；已在 **dsh 0.1.7-rc.2** 上验证：工具注册、skill 注册（含 `resourceBase` 与 references 解析）、system prompt 注入、`kimi_webbridge status` 健康检查均正常。技能注册走 `ctx.skills.register`（运行时技能），并额外传入 `resourceBase: { kind: "directory", path: <skill 目录> }`——宿主会把该目录作为 skill 的基准目录渲染给模型。
 
 | peer | 声明范围 |
 |---|---|
-| `@deepseek-ai/dsh-tools` | `^0.1.0-rc.7 \|\| ^0.1.1-rc.2 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1` |
+| `@deepseek-ai/dsh-tools` | `^0.1.0-rc.7 \|\| ^0.1.1-rc.2 \|\| ^0.1.2-rc.1 \|\| ^0.1.5-rc.1 \|\| ^0.1.7-rc.2` |
 | `@deepseek-ai/dsh-llm` | 同上 |
 | `@deepseek-ai/schemastery` | `^3.18.1` |
 
