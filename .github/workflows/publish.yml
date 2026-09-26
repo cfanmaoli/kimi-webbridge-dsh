@@ -1,5 +1,15 @@
 name: publish
 
+# Release checklist (maintainer-facing; the vendored skill has its own notes in
+# skill/README.md):
+#   - bump "version" in package.json, then tag and push:
+#       git commit -am "chore: release vX.Y.Z" && git tag -a vX.Y.Z -m vX.Y.Z
+#       git push origin main && git push origin vX.Y.Z
+#   - publish a Release for that tag (drafts do not trigger this workflow)
+#   - dsh prereleases: node-semver only admits a prerelease when the range carries a
+#     comparator with the *same* major.minor.patch, so every new dsh series needs its
+#     own "|| ^<tuple>-rc.N" branch in peerDependencies. A range that looks broad
+#     (">=0.0.1-rc.1 <0.2.0") silently excludes all prereleases and users hit ERESOLVE.
 on:
   # npm publish runs only when a stable GitHub Release is published;
   # pushing a tag alone (git push --tags) does NOT trigger this workflow.
