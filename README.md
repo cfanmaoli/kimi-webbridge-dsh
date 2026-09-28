@@ -48,7 +48,7 @@ dsh plugin --profile web add kimi-webbridge-dsh
 
 - **浏览器扩展**：需自行安装并连接（[Chrome Web Store](https://chromewebstore.google.com/detail/kimi-webbridge/fldmhceldgbpfpkbgopacenieobmligc)）；`status` 显示 `extension_connected: true` 即可用。
 - **守护进程**：无需预装，插件自动供应；与官方安装器共用 `~/.kimi-webbridge/bin/`（Windows `%USERPROFILE%\.kimi-webbridge\bin\`）。
-- **dsh 版本**：只 import 宿主提供的 `@deepseek-ai/*`（声明为 peer，不打包副本），已在 **0.1.7-rc.2** 验证。
+- **dsh 版本**：只 import 宿主提供的 `@deepseek-ai/*`（声明为 peer，不打包副本），已在 **0.2.0-rc.1** 验证，peer 范围覆盖 0.1.0-rc.7 起的整个 0.1.x / 0.2.x。dsh 换代后如果 `kimi_webbridge` 工具、系统提示段落和 skill 一起消失，通常就是插件版本还没覆盖新 dsh——升级本插件再重启即可。
 - **`status` 里的 `version_mismatch` / `update_available` / `skill_mismatch`**：把其中的 `command` 原样交给用户执行；**不要**自行 `upgrade` / `stop` / `restart` / `uninstall`，它们会杀掉正在运行的守护进程。
 - `status.skills` 为空是正常的：守护进程只识别 Claude Code / Codex / Hermes / OpenClaw / Kimi，dsh 拿到技能的唯一途径就是本插件。
 

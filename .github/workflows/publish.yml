@@ -10,6 +10,11 @@ name: publish
 #     comparator with the *same* major.minor.patch, so every new dsh series needs its
 #     own "|| ^<tuple>-rc.N" branch in peerDependencies. A range that looks broad
 #     (">=0.0.1-rc.1 <0.2.0") silently excludes all prereleases and users hit ERESOLVE.
+#   - an uncovered dsh version is not an error the user sees: app boot drops the bundle
+#     into skippedBundles, so the tool, the prompt section and the skill all vanish with
+#     no message. Check the published runtimes after a dsh update and add the missing
+#     tuple with:
+#       npm view @deepseek-ai/dsh dist-tags --json
 on:
   # npm publish runs only when a stable GitHub Release is published;
   # pushing a tag alone (git push --tags) does NOT trigger this workflow.
