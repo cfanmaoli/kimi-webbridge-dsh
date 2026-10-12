@@ -15,7 +15,7 @@
  *
  * Usage:
  *   node scripts/fetch-upstream-skill.mjs                  # fetch latest, rewrite skill/
- *   node scripts/fetch-upstream-skill.mjs --version v2.0.22
+ *   node scripts/fetch-upstream-skill.mjs --version v2.0.23
  *   node scripts/fetch-upstream-skill.mjs --check           # fetch and compare, never write
  *   node scripts/fetch-upstream-skill.mjs --verify-local    # no network: verify vendored files
  *
@@ -125,7 +125,7 @@ function readManifest() {
  * platform-named copy for its installer, and a divergence would mean this plugin is
  * vendoring the wrong variant.
  *
- * @param version - `latest` or a pinned tag such as `v2.0.22`.
+ * @param version - `latest` or a pinned tag such as `v2.0.23`.
  * @returns the normalised package.
  */
 async function fetchPackage(version) {
@@ -254,7 +254,7 @@ async function main() {
   const args = process.argv.slice(2);
   const versionFlag = args.indexOf("--version");
   const requested = versionFlag === -1 ? "latest" : args[versionFlag + 1];
-  if (requested === undefined) throw new Error("--version needs a value, e.g. --version v2.0.22");
+  if (requested === undefined) throw new Error("--version needs a value, e.g. --version v2.0.23");
   if (args.includes("--verify-local")) {
     const { manifest, problems } = verifyLocal();
     if (problems.length > 0) {

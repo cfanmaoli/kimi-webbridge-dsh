@@ -32,7 +32,7 @@ dsh plugin --profile web add kimi-webbridge-dsh
 ```yaml
 - id: kimi-webbridge
   config:
-    daemonVersion: v2.0.22
+    daemonVersion: v2.0.23
 ```
 
 | 键 | 默认 | 说明 |
