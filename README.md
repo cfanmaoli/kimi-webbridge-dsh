@@ -41,14 +41,16 @@ dsh plugin --profile web add kimi-webbridge-dsh
 | `requestTimeoutMs` | `120000` | 单次请求超时（ms） |
 | `autoStartDaemon` | `true` | 未运行时自动启动 |
 | `autoInstallDaemon` | `true` | 二进制缺失时自动下载安装 |
-| `daemonVersion` | `latest` | 自动安装的版本，带 `v` 前缀，建议与扩展版本一致 |
+| `autoUpdateDaemon` | `true` | 守护进程落后于已发布版本或落后于扩展时，自动 `upgrade`（每进程最多一次） |
+| `daemonVersion` | `latest` | 安装/升级失败后手工兜底时使用的版本，带 `v` 前缀 |
 | `registerSkill` | `true` | 注册 `kimi-webbridge` skill |
 
 ## 要求与提示
 
 - **浏览器扩展**：需自行安装并连接（[Chrome Web Store](https://chromewebstore.google.com/detail/kimi-webbridge/fldmhceldgbpfpkbgopacenieobmligc)）；`status` 显示 `extension_connected: true` 即可用。
 - **守护进程**：无需预装，插件自动供应；与官方安装器共用 `~/.kimi-webbridge/bin/`（Windows `%USERPROFILE%\.kimi-webbridge\bin\`）。
-- **dsh 版本**：只 import 宿主提供的 `@deepseek-ai/*`（声明为 peer，不打包副本），已在 **0.2.0-rc.1** 验证，peer 范围覆盖 0.1.0-rc.7 起的整个 0.1.x / 0.2.x。dsh 换代后如果 `kimi_webbridge` 工具、系统提示段落和 skill 一起消失，通常就是插件版本还没覆盖新 dsh——升级本插件再重启即可。
+- **dsh 版本**：只 import 宿主提供的 `@deepseek-ai/*`（声明为 peer，不打包副本），已在 **0.2.1-rc.3** 验证，peer 范围覆盖 0.1.0-rc.7 起的整个 0.1.x / 0.2.x。dsh 换代后如果 `kimi_webbridge` 工具、系统提示段落和 skill 一起消失，通常就是插件版本还没覆盖新 dsh——升级本插件再重启即可。
+- **守护进程自动更新**：浏览器扩展会随商店自动更新，守护进程不会——所以插件在每次进程内的**第一次** `status` 发现它落后时，直接调用上游的 `kimi-webbridge upgrade`（它会停掉、换二进制、再拉起，并顺带刷新其他 agent 运行时里的技能副本）。因为这次重启不可避免，插件只在开始浏览器任务之前尝试，且每进程最多一次；失败或想全程手动就设 `autoUpdateDaemon: false`，改用 `status` 报出的命令。
 - **`status` 里的 `version_mismatch` / `update_available` / `skill_mismatch`**：把其中的 `command` 原样交给用户执行；**不要**自行 `upgrade` / `stop` / `restart` / `uninstall`，它们会杀掉正在运行的守护进程。
 - `status.skills` 为空是正常的：守护进程只识别 Claude Code / Codex / Hermes / OpenClaw / Kimi，dsh 拿到技能的唯一途径就是本插件。
 

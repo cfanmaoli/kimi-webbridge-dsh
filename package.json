@@ -1,7 +1,7 @@
 {
   "name": "kimi-webbridge-dsh",
   "description": "Infrastructure plugin for dsh: provisions the kimi-webbridge daemon (auto-install with SHA-256 verification, auto-start) and registers the official upstream skill package (SKILL.md + references/, vendored from the CDN and digest-pinned) as a runtime skill. Registers a thin kimi_webbridge tool (status health check only).",
-  "version": "1.4.13",
+  "version": "1.5.0",
   "license": "MIT",
   "repository": {
     "type": "git",
