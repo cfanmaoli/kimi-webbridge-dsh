@@ -15,12 +15,14 @@
  *
  * Usage:
  *   node scripts/fetch-upstream-skill.mjs                  # fetch latest, rewrite skill/
- *   node scripts/fetch-upstream-skill.mjs --version v2.0.26
+ *   node scripts/fetch-upstream-skill.mjs --version v2.0.27
  *   node scripts/fetch-upstream-skill.mjs --check           # fetch and compare, never write
  *   node scripts/fetch-upstream-skill.mjs --verify-local    # no network: verify vendored files
  *
- * `--check` exits non-zero when upstream moved (release, tarball digest, file set or
- * file contents), so a scheduled job can open an issue instead of drifting silently.
+ * `--check` fails when upstream's *instructions* moved: a changed file set, or a file
+ * whose content differs beyond its frontmatter release stamp. A release that only bumps
+ * `metadata.version` (upstream ships those for daemon-only builds) is reported but exits
+ * zero, so a scheduled job fails on real drift instead of on every version bump.
  *
  * @module scripts/fetch-upstream-skill
  */
@@ -125,7 +127,7 @@ function readManifest() {
  * platform-named copy for its installer, and a divergence would mean this plugin is
  * vendoring the wrong variant.
  *
- * @param version - `latest` or a pinned tag such as `v2.0.26`.
+ * @param version - `latest` or a pinned tag such as `v2.0.27`.
  * @returns the normalised package.
  */
 async function fetchPackage(version) {
@@ -205,6 +207,43 @@ function compare(previous, pkg) {
   return differences;
 }
 
+/**
+ * Drop the frontmatter release stamp so two releases that only bumped it compare equal.
+ *
+ * The stamp is the one line upstream rewrites for a daemon-only release; every other byte
+ * in the document is instruction text this plugin would have to react to.
+ */
+function withoutVersionStamp(text) {
+  return text.replace(/(\r?\n[ \t]+version:[ \t]*)"[^"\n]*"/u, '$1"<release>"');
+}
+
+/**
+ * Split recorded-vs-upstream differences into instruction drift and release-only movement.
+ *
+ * @param previous - the recorded manifest, or null when nothing was ever vendored.
+ * @param pkg - the freshly fetched package.
+ * @param differences - the raw difference list from {@link compare}.
+ * @returns the differences that need a human, and whether nothing but the release moved.
+ */
+function classify(previous, pkg, differences) {
+  const content = [];
+  for (const change of differences) {
+    if (change.startsWith("release ") || change.startsWith("tarball digest ")) continue;
+    const changed = /^changed (.+)$/u.exec(change);
+    if (changed !== null) {
+      const path = changed[1];
+      const localPath = join(SKILL_DIR, path);
+      const remote = pkg.files.find((file) => file.path === path);
+      if (remote !== undefined && existsSync(localPath)) {
+        const local = readFileSync(localPath, "utf8");
+        if (withoutVersionStamp(local) === withoutVersionStamp(remote.data.toString("utf8"))) continue;
+      }
+    }
+    content.push(change);
+  }
+  return { content, releaseOnly: previous !== null && content.length === 0 };
+}
+
 /** List every file under the managed roots, relative to skill/. */
 function listManagedFiles() {
   const found = [];
@@ -254,7 +293,7 @@ async function main() {
   const args = process.argv.slice(2);
   const versionFlag = args.indexOf("--version");
   const requested = versionFlag === -1 ? "latest" : args[versionFlag + 1];
-  if (requested === undefined) throw new Error("--version needs a value, e.g. --version v2.0.26");
+  if (requested === undefined) throw new Error("--version needs a value, e.g. --version v2.0.27");
   if (args.includes("--verify-local")) {
     const { manifest, problems } = verifyLocal();
     if (problems.length > 0) {
@@ -270,7 +309,12 @@ async function main() {
   if (args.includes("--check")) {
     const differences = compare(previous, pkg);
     if (differences.length > 0) {
-      console.error(`upstream skill moved (vendored ${previous?.version ?? "nothing"} -> ${pkg.version}):\n  ${differences.join("\n  ")}`);
+      const { content, releaseOnly } = classify(previous, pkg, differences);
+      if (releaseOnly) {
+        console.log(`upstream moved to ${pkg.release} with no instruction changes (release stamp only):\n  ${differences.join("\n  ")}\nrun "npm run fetch-skill" when convenient to refresh the pin`);
+        return;
+      }
+      console.error(`upstream skill changed (vendored ${previous?.version ?? "nothing"} -> ${pkg.version}):\n  ${content.join("\n  ")}`);
       process.exitCode = 1;
       return;
     }

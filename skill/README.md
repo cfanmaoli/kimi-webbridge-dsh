@@ -21,8 +21,8 @@ To update:
 
 ```bash
 npm run fetch-skill                 # vendor the latest release
-node scripts/fetch-upstream-skill.mjs --version v2.0.26   # or pin one
-node scripts/fetch-upstream-skill.mjs --check             # report upstream drift only
+node scripts/fetch-upstream-skill.mjs --version v2.0.27   # or pin one
+node scripts/fetch-upstream-skill.mjs --check             # fail only when the instructions changed
 ```
 
 ## What dsh adds
