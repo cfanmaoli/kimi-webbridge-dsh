@@ -1,41 +1,41 @@
 ---
 name: kimi-webbridge
 description: |
-  Kimi Browser Extension（Kimi 浏览器扩展，原 Kimi WebBridge）lets AI control the user's real browser — navigate, click, type, read, screenshot, and interact with any website using the user's actual login sessions. Use this skill whenever the user wants to interact with websites, automate browser tasks, scrape web content, or perform any action requiring a real browser. Also use when the user mentions "browser", "webpage", "open URL", "screenshot", asks to read/interact with any website, or wants a reusable CLI tool or script that automates a specific website. Use even for simple-sounding browser requests — the daemon handles all complexity.
+  Operate websites in the user's real browser with existing login sessions: read pages, interact, capture screenshots, and automate browser workflows. Also use when building a reusable website CLI or script through Kimi WebBridge.
 metadata:
-  version: "2.0.27"
+  version: "2.0.32"
 ---
 
 # Kimi Browser Extension (formerly Kimi WebBridge)
 
 Control the user's real browser (with their login sessions) via a local daemon at `http://127.0.0.1:10086` (the default address — see [If a tool call fails](#if-a-tool-call-fails-daemon-or-extension-not-ready) for when it differs).
 
-When the user asks to build a reusable CLI tool or script for a website (rather than do a one-off task), follow `references/cli-creator/workflow.md`. Its phases say when to read each of these:
+For a reusable website CLI or script, follow the [CLI creation workflow](references/cli-creator/workflow.md). For one-off browser tasks, use the tools below.
 
-- `references/cli-creator/site-exploration.md` — the protocol for finding how each feature gets its data
-- `references/cli-creator/login-handling.md` — when the site requires login
-- `references/cli-creator/go-layout.md` — when the CLI is written in Go
-- `references/cli-creator/companion-skill-template.md` — the template for the skill that tells agents how to use the CLI
-
-## Tools
+## Common tools
 
 | Tool | Args | Returns | Note |
 |------|------|---------|------|
 | `navigate` | `url`, `newTab`(bool), `group_title` | `{success, url, tabId}` | First call opens a tab — see [Tabs](#tabs-and-the-current-tab). `group_title` sets the group's visible label |
-| `find_tab` | `url`, `active`(bool) | `{success, url, tabId, borrowed}` | Re-select a tab **this session** opened; `active:true` borrows the tab the **user** is viewing — see [Tabs](#tabs-and-the-current-tab) |
+| `find_tab` | `url`, `active`(bool) | `{success, url, tabId, borrowed}` | Re-select a tab in **this session**; `active:true` borrows the tab the **user** is viewing — see [Tabs](#tabs-and-the-current-tab) |
 | `snapshot` | optional `ref`; `format:"aria"` opts into text with optional `max_chars` (1–60000), or `cursor` to continue | Default `{url, title, tree}`; ARIA `{url, title, tree_text}` | **Accessibility tree** (text) — use this to read page content and locate elements |
+| `find` | `query` | `{matches, totalMatches}` | Search page text for refs, then narrow with `snapshot(ref)` |
+| `read_page` | optional `max_chars`, `start`, `frame` | `{text, complete, nextStart?, note?}` | Read document text; follow completeness and continuation metadata |
+| `wait` | `text`, `text_gone`, `selector`, or `frame`; optional `timeout_ms` | condition result, timeout observation | Wait for an observed condition; a duration alone is not a condition |
+| `send_keys` | `keys`, optional `repeat`, `focus_emulation` | `{success, dispatched, os}` | e.g. `Enter`, `Escape`, `Mod+A`; acts on the focused element |
+| `mouse_click` | `selector`, optional `focus_emulation` | action result | Real pointer input for a visible element |
 | `click` | `selector` (@e ref or CSS) | `{success, tag, text}` | Synthetic `el.click()` |
 | `fill` | `selector`, `value` | `{success, tag, mode}` | Works on `<input>`/`<textarea>` AND `[contenteditable]` (ProseMirror/Lexical/Slate). `mode` is `"value"` or `"contenteditable"` |
-| `evaluate` | `code` (for `await`, wrap it in an async IIFE — top-level `await` is a SyntaxError) | `{type, value}` | |
-| `cdp` | `method`, `params` | raw CDP response | Raw `chrome.debugger` passthrough — what `evaluate` is to JS, `cdp` is to CDP. Low-level escape hatch for cases the tools above don't cover. `Page.bringToFront` is a last resort: while focus emulation is off on a tab, a call turns it on instead of activating the tab (the tab renders and takes real input without being switched to); only a call once emulation is on activates, and it never pulls Chrome over another app the user is in. `Target.activateTarget` is refused |
-| `screenshot` | `format`(png\|jpeg), `quality`(0-100), optional `selector` (@e/CSS), optional `path` | `{format, path, sizeBytes, mimeType}` | Returns a file path, not base64 — see [Screenshots](#screenshots) |
+| `evaluate` | `code` | `{type, value}` | Page JavaScript; wrap statements/async work in an IIFE |
+| `cdp` | `method`, `params` | raw CDP response | Low-level fallback; see [Browser interaction](#browser-interaction) |
+| `screenshot` | `format`(png\|jpeg), `quality`(0-100), optional `selector` (@e/CSS), optional `path` | `{format, path, sizeBytes, mimeType}` | Returns a file path, not base64 — see [Screenshots](#screenshots-and-pdf-export) |
 | `network` | `cmd`(start\|stop\|list\|detail), `filter`(URL substring, for `list`), `requestId`(for `detail`) | `list`: `{count, requests:[{requestId, url, method, status, mimeType, completed}]}`; `detail`: that request plus `requestHeaders`, `requestBody`, `body` (the response) | Capture is per tab, from `start` on. Call `detail` before `stop` — stopping releases the response bodies, and `detail` then returns `bodyError` instead of `body` |
 | `upload` | `selector`, `files`(string[]) | `{success, fileCount}` | |
-| `save_as_pdf` | `paper_format`, `landscape`, `scale`, `print_background`, optional `path` | `{path, sizeBytes, mimeType, pageTitle}` | Render current page → PDF, returns a file path — see [Save as PDF](#save-the-current-page-as-pdf) |
-| `list_tabs` | — | `{success, tabs:[{tabId, url, title, active, groupTitle}]}` | Inspect tabs in the current session |
+| `save_as_pdf` | `paper_format`, `landscape`, `scale`, `print_background`, optional `path` | `{path, sizeBytes, mimeType, pageTitle}` | Render current page → PDF, returns a file path — see [Save as PDF](#screenshots-and-pdf-export) |
+| `list_tabs` | — | `{success, tabs:[{tabId, url, title, active, groupTitle, borrowed}]}` | Inspect tabs in the current session; `borrowed:true` identifies tabs to preserve during cleanup |
 | `list_browser_tabs` | — | `{success, tabs:[{tabId, windowId, url, title, active}]}` | Inspect all tabs visible to this WebBridge connection, across windows; does not attach or focus a tab |
 | `attach_tab` | `tabId` | `{success, tabId, url, title, borrowed}` | Attach a specific existing tab to this session without focusing it; borrowed tabs survive `close_session` |
-| `close_tab` | — | `{success, closed: bool}` | Close the current tab in the session |
+| `close_tab` | — | `{success, closed: bool}` | Close the current tab only when that is intended; it can close a borrowed tab |
 | `close_session` | — | `{success, closed: int}` | Close tabs opened by this session; borrowed tabs stay open. `closed` is the count. See [Sessions](#sessions) for when to call |
 
 ### Tabs and the current tab
@@ -43,14 +43,9 @@ When the user asks to build a reusable CLI tool or script for a website (rather 
 Single-tab tools (`snapshot`, `click`, `fill`, `screenshot`, `save_as_pdf`) act on the **current tab** — the one you most recently opened with `navigate`, selected with `find_tab`, or attached with `attach_tab`.
 
 - **Opening pages**: use `newTab:true` when pages should coexist (comparing, cross-referencing); omit it to send the current tab to a new URL.
-- **Going back to an earlier tab**: call `find_tab` to make a tab **you opened earlier in this session** the current one again. Pass the tab's URL — take it from `list_tabs` or the earlier `navigate` result. Matching is by host: `kimi.com` also finds a `www.kimi.com` tab, and the path is ignored. By default `find_tab` searches **only this session's own tabs** — it never reaches into the user's other tabs or windows.
+- **Going back to an earlier tab**: `find_tab` searches tabs already in this session by host, ignoring paths (`kimi.com` also matches `www.kimi.com`). For a specific tab among several on the same host, take its `tabId` from `list_tabs` and use `attach_tab` to select it exactly. Reattaching an owned tab preserves its ownership.
 - **Acting on a page the user already has open**: call `list_browser_tabs`, choose the tab by its URL/title and `tabId`, then call `attach_tab` with that ID. This also works for tabs in other windows and does not change the user's foreground tab. The attached tab is borrowed and remains open after `close_session`. For the particular tab the user is currently viewing, `find_tab` with `active:true` still works.
 - If `find_tab` errors with "no tab matching … in this session", the page isn't open in this session — `navigate` with `newTab:true` instead.
-
-```bash
-curl -s -X POST http://127.0.0.1:10086/command \
-  -d '{"action":"find_tab","args":{"url":"https://www.kimi.com","active":true},"session":"k26-research"}'
-```
 
 ### Call Format
 
@@ -93,7 +88,7 @@ curl.exe -s -X POST http://127.0.0.1:10086/command -H "Content-Type: application
 - **Pick one session name at the task's start, put it on every command, and never switch mid-task — even across different sites.** Switching session names per site is the #1 cause of fragmented tab groups.
 - Name it after the **task**, not the site (`camping-research`, `phone-compare`). Use multiple sessions only for genuinely unrelated parallel tasks.
 - `group_title` is the human-readable group label — write it in the user's language, on the **first** `navigate` of the task.
-- When you create the group (the first `navigate` of a task), tell the user once that this task's pages are collected under group «title», and that you'll close them whenever they ask.
+- Keep startup updates about the user's task; defer tab cleanup decisions to [Task completion](#task-completion), without an opening reminder about closing the group.
 
 ```bash
 # First tab: set session + a human label (in the user's language)
@@ -104,69 +99,44 @@ curl -s -X POST http://127.0.0.1:10086/command \
   -d '{"action":"navigate","args":{"url":"https://www.moonshot.cn","newTab":true},"session":"k26-research"}'
 ```
 
-Closing is always user-initiated: call `close_session` only when the user explicitly asks ("close those", "clear the tabs"). It clears the whole group in one call.
+### Task completion
 
-## Screenshots
+Treat the task group as the cleanup unit. Follow existing user instructions to keep or close it. A turn ending is not task completion: keep the group while work, login, approval or recovery is still pending.
 
-The daemon writes the image to disk and returns `{format, path, sizeBytes, mimeType}` — never base64, since the model can't read raw image bytes. Take the `.path` and open it with the `Read` tool to actually see it.
+When the task is complete and its verified result is ready to deliver, call `list_tabs` to record the current inventory. Retaining any page in the group means keeping the group:
 
-```bash
-# Default: PNG of the visible viewport, daemon picks a temp path
-curl ... -d '{"action":"screenshot","args":{}}'
-# Options (each independent): JPEG quality, element-only via @e/CSS selector, custom output path
-curl ... -d '{"action":"screenshot","args":{"format":"jpeg","quality":60}}'
-curl ... -d '{"action":"screenshot","args":{"selector":"@e123"}}'
-```
+- **Temporary task, results captured:** call `close_session` to close the whole task group. Borrowed user tabs are automatically spared; no separate ownership classification is needed.
+- **Pages are the deliverable or still in use:** keep the whole group, including when there is unsaved work or the user has taken over a page. No cleanup question is needed.
+- **Uncertain:** present the result, then ask once whether to close the named task group or keep it. Prefer the host's native choice tool when exposed and permitted for this purpose in the current mode; otherwise ask in plain text. Use concrete options such as “Close task pages” / “Keep pages”. Mention any uncertainty about unsaved work. An unanswered question, dismissal or preselected option means keep; do not repeatedly ask.
 
-A caller-supplied `path` is honored verbatim (parent dirs created, existing file overwritten) — use a unique name to avoid clobbering. `save_as_pdf` follows the same rule.
+For a delayed close answer, refresh `list_tabs`. If the group has gained pages or its use has changed since the question, keep it until the changed scope is resolved. Use `close_session` for group cleanup, not a per-page deletion workflow. Report only the actual `closed` count; if fewer tabs close than expected, check the original IDs with `list_browser_tabs` before claiming all pages closed, since `close_session` clears its ledger even on partial closure.
 
-## Prefer snapshot over CSS/JS selectors
+## Reading pages
 
-`snapshot` returns interactive elements with `@e` refs bound to the observed DOM nodes. Copy refs as opaque strings into click/fill. Re-reading a page preserves refs for the same nodes; a removed node or changed document/connection requires a fresh snapshot. Refs never automatically select a replacement by name.
+Start with `snapshot` for structure and actionable `@e` refs. Copy refs as opaque strings: they stay bound to the same DOM nodes, not to a replacement with the same name. Refresh the snapshot after navigation or a stale-ref error. Use `find(query)` then `snapshot(ref)` to narrow a large page.
 
-For bounded text reads, call `snapshot` with `format:"aria"` and optionally `max_chars` (default 60000). This bounds `tree_text`, not metadata. If `truncated:true`, pass `next_cursor` back as `cursor` (without `ref`) to continue the same saved observation; `continued:true` identifies subsequent chunks. Concatenate `tree_text` without extra separators: chunks can split long lines, and budgets count UTF-16 code units without splitting surrogate pairs (a budget of 1 errors when the next character needs 2). Cursors expire after five minutes, cache eviction, navigation or connection reset; start a new snapshot on an expired-cursor error. Same-document content edits do not refresh saved text. The cache holds at most eight snapshots / eight million code units; observations above four million fail explicitly, so narrow the read. Alternatively, use `find` with a specific `query` to search the full main-document accessibility tree, then `snapshot` with the chosen match's `ref` to read its subtree. Search results carry ancestor paths to distinguish same-name matches. Scope and budget do not reassign existing refs; iframe content is not included in this search.
+For bounded text, call `snapshot` with `format:"aria"` and `max_chars` (1–60000, default 60000). If `truncated:true`, pass `next_cursor` as `cursor` with `format:"aria"` and without `ref`; concatenate `tree_text` chunks without extra separators. Continuations read the saved observation, not later page edits. Restart the snapshot if the cursor expires.
 
-Fall back to `evaluate` (JS) only when:
-- The target has no `@e` ref in the snapshot
-- You need attributes not in the snapshot (e.g., `href`)
-- You need to dispatch complex event sequences, or scroll
+Use `read_page({})` for the main document's text; omit `frame`. The main document may be an empty shell around an embedded document, so inspect `snapshot.frames` when the expected content is absent. A `complete:false` result is partial, not proof the rest of the document is empty. Follow its `note`; when `nextStart` is supplied, pass it as `start` to continue. Dynamic pages may change between scans; do not keep scanning an endless feed to try to finish it.
 
-## Evaluate Tips
+**Embedded documents:** top-page refs and DOM actions do not reach into iframes. Use a `frame` handle from `snapshot.frames` with `read_page`, e.g. `{"frame":"#f1"}`. `wait` with `{"frame":"any"}` waits for a large readable embedded document; use the snapshot for smaller frames. Frame reads must echo `frame` in the response; if absent, the extension is older and returned the top page. Ask the user to update it. Acting inside frames is not supported by these DOM tools; a frame URL may work as a separate page, but authenticated previews often do not.
 
-- Always use compact `JSON.stringify(data)` — never add `null, 2` formatting. Indentation and newlines can inflate the response several times over, causing truncation during transmission.
-- `evaluate` calls share the page's JS realm — re-declaring the same `const`/`let` across two calls throws `SyntaxError`. Wrap in an IIFE for a fresh scope: `(() => { const x = ...; return x; })()`.
+## Browser interaction
 
-## Text input — use `fill`
+- After an action, wait for an observed condition, e.g. `wait({"selector":".search-result","timeout_ms":10000})`; a duration alone is not a condition. Text and selectors check the main page, excluding iframe documents. For embedded documents, follow the frame workflow above. On `timedOut:true`, inspect `observation` if present, then use `snapshot` to choose the next step. Extend the deadline only when the page shows continuing progress.
+- Use `click` / `fill` with observed refs. `fill` replaces existing text; to append, read the current value first and concatenate.
+- For Enter, Escape or shortcuts, use `send_keys`, e.g. `{"keys":"Enter"}`. On background tabs, enable focus emulation (below) before focusing the intended element, send the keys, then disable emulation. Verify the resulting page state: successful dispatch alone does not prove the form submitted. `Mod` selects Cmd on macOS and Ctrl elsewhere; native macOS text inputs may ignore Cmd editing shortcuts, so use `fill` for text replacement.
+- When a site requires real pointer events, use `mouse_click` with the observed selector and `focus_emulation:true` for a background tab. Login, CAPTCHA or other human-only gates may still require the user.
+- Use `evaluate` for attributes absent from the snapshot, page data extraction, verified in-page API requests, or interactions the higher-level tools cannot express. Wrap code in `(() => { ... })()` or `(async () => { ... })()` to avoid global declaration collisions and allow `await`. Keep returned data bounded; if serializing, use compact `JSON.stringify`.
+- Raw `cdp` is a fallback. For background rendering/input, enable `Emulation.setFocusEmulationEnabled` with `{"enabled":true}` and disable it when done. `Page.bringToFront` first enables emulation if off; a subsequent call can activate the tab. Reserve activation for when background operation fails; `Target.activateTarget` is refused.
 
-`fill` (selector = CSS or `@e` ref, plus the value) works on `<input>`/`<textarea>` (returns `mode: "value"`) and on `[contenteditable]` rich editors — ProseMirror, TipTap, Lexical, Slate, Quill, etc. (returns `mode: "contenteditable"`), firing the right input events so the page reacts.
+## Screenshots and PDF export
 
-`fill` is **clear-and-insert**: existing content is replaced. To append, read the current value via `evaluate`, concatenate, then `fill` with the result.
+`screenshot` and `save_as_pdf` return a local `path`, not base64. Open screenshots with the host's available image-viewing tool. An explicit `path` overwrites an existing file, so choose a unique output path.
 
-## Form submit / special keys
+For `screenshot`, omit options for a PNG viewport capture; use `selector` for one element, or `format:"jpeg"` and `quality` for JPEG.
 
-There's no separate "press Enter" tool. To submit a form, click the submit button directly (`click` on the @e ref or selector). To dispatch a key event programmatically (e.g. Escape to close a modal):
-
-```bash
-{"action":"evaluate","args":{"code":"document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))"}}
-```
-
-## Save the current page as PDF
-
-`save_as_pdf` renders the current page to PDF and returns the file path. All args optional:
-- `paper_format`: `letter` (default) \| `a4` \| `legal` \| `a3` \| `tabloid`
-- `landscape`: `false` (default)
-- `scale`: `1.0` (default), range `[0.1, 2.0]`
-- `print_background`: `true` (default) — keep background colors
-- `path`: caller-supplied output path; if absent, daemon picks a default under OS temp dir using the page title as the filename
-
-`path` semantics match `screenshot`: written verbatim, parent dirs auto-created, existing files overwritten.
-
-Decoded PDF cap is 100 MB. Above that the daemon refuses; reduce `scale` or split the page.
-
-## Known limitations
-
-- **Sites that strictly check `event.isTrusted`** (some banking portals, captchas) ignore `click` / `fill` because those fire DOM-level synthetic events (`isTrusted=false`). For these, tell the user the page needs manual interaction. (Trusted input is possible at the protocol level via the `cdp` escape hatch, but treat that as advanced: your tabs are background tabs, and real input only reaches a background tab while focus emulation is on — send `Emulation.setFocusEmulationEnabled` `{"enabled":true}` before the input and `{"enabled":false}` when done with the tab. If input still does not land, `Page.bringToFront` is the last resort; see the `cdp` row.)
-- **Content inside iframes**: `snapshot`, `fill`, `click` and `evaluate` see only the top document — an embedded document (preview pane, sandbox preview, embedded app) is a separate page and its nodes are not in the tree. When a snapshot lists `frames` after the tree (`frames: [{frame:"#f1", url, size, …}]`, biggest first), read one with `read_page` `{"frame":"#f1"}`, using a handle from that list. A frame read echoes `frame` in its result; if it does not, the extension is older than this skill and returned the top page instead — see Version mismatches below. A preview frame often appears many seconds after the page itself loads — `wait` `{"frame":"any"}` returns the moment one filling a large part of the screen is readable, instead of re-snapshotting. A PDF preview is read through the viewer's own document, so every page comes back without scrolling. Acting on elements inside a frame is still not supported — navigating to the frame's URL directly sometimes works, but an authenticated preview stream usually loads nothing on its own.
+For `save_as_pdf`, optional arguments are `paper_format` (`letter` default, `a4`, `legal`, `a3`, `tabloid`), `landscape` (default false), `scale` (0.1–2, default 1), `print_background` (default true), and `path`. The daemon rejects PDFs larger than 100 MB; reduce the output or split the page.
 
 ## If a tool call fails (daemon or extension not ready)
 
@@ -176,18 +146,15 @@ Where the daemon listens is always in `start`'s output, or in `kimi-webbridge st
 
 **If the reply is `ok:false` with code `extension_not_connected`**, the daemon is fine and the browser side isn't — `start` won't change that. The message names what the user has to do; relay it in their language and carry on once they confirm.
 
-**`start` fails with "did not come up … held by another program"** → another program owns the port. Move the daemon: write `{"addr":"127.0.0.1:<port>"}` (a free port of your choice) to the config file the error names, run `start` again, then ask the user to point the extension at the new port once (Kimi side panel → Settings → Local agent remote control → Connection address → `ws://127.0.0.1:<port>/ws`; it remembers).
+**`start` fails with “held by another program”**: follow [Listen address](references/operations.md#listen-address) to move the daemon and reconnect the extension.
 
 If it still fails, the binary is missing (`command not found` means kimi-webbridge isn't installed), or the browser extension won't connect — point the user to the help page instead of deep-troubleshooting:
 
 - English: https://www.kimi.com/en/products/kimi-webbridge
 - 中文: https://www.kimi.com/products/kimi-webbridge
 
-Never run `stop` / `restart` / `upgrade` / `uninstall` automatically — those kill a running daemon. When `status` shows `version_mismatch`, `update_available` or `skill_mismatch`, or a `kimi-webbridge` command prints a `==> … Run: <command>` line (the same notices, on stderr), tell the user and hand them the command verbatim to run — the `command` field, or what follows `Run:`; that is what it is for. When the user asks about kimi-webbridge itself (install, start/stop/upgrade, "is it running", what `status` means, moving it to another port), read `references/operations.md` first.
+Never run `stop` / `restart` / `upgrade` / `uninstall` automatically — those kill a running daemon. When `status` shows `version_mismatch`, `update_available` or `skill_mismatch`, or a command prints a `==> … Run: <command>` notice, read [Update notices](references/operations.md#update-notices) for when and how to relay it. When the user asks about kimi-webbridge itself (install, start/stop/upgrade, "is it running", what `status` means, moving it to another port), read `references/operations.md` first.
 
 ## Version mismatches
 
-If a tool returns an error containing **"Please update the Kimi Browser Extension"**, the user's browser extension is older than this skill. Don't try to reconcile versions yourself — just tell the user, in their language, to update the extension and retry:
-
-- English: https://www.kimi.com/en/products/kimi-webbridge
-- 中文: https://www.kimi.com/products/kimi-webbridge
+If a tool error says **“Please update the Kimi Browser Extension”**, tell the user to update the browser extension using the help page above, then retry. Updating only the daemon does not add missing browser tools.
