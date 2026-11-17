@@ -3,7 +3,7 @@ name: kimi-webbridge
 description: |
   Operate websites in the user's real browser with existing login sessions: read pages, interact, capture screenshots, and automate browser workflows. Also use when building a reusable website CLI or script through Kimi WebBridge.
 metadata:
-  version: "2.0.32"
+  version: "2.0.39"
 ---
 
 # Kimi Browser Extension (formerly Kimi WebBridge)
@@ -21,7 +21,7 @@ For a reusable website CLI or script, follow the [CLI creation workflow](referen
 | `snapshot` | optional `ref`; `format:"aria"` opts into text with optional `max_chars` (1–60000), or `cursor` to continue | Default `{url, title, tree}`; ARIA `{url, title, tree_text}` | **Accessibility tree** (text) — use this to read page content and locate elements |
 | `find` | `query` | `{matches, totalMatches}` | Search page text for refs, then narrow with `snapshot(ref)` |
 | `read_page` | optional `max_chars`, `start`, `frame` | `{text, complete, nextStart?, note?}` | Read document text; follow completeness and continuation metadata |
-| `wait` | `text`, `text_gone`, `selector`, or `frame`; optional `timeout_ms` | condition result, timeout observation | Wait for an observed condition; a duration alone is not a condition |
+| `wait` | `text`, `text_gone`, `selector`, or `frame`; optional `timeout_ms` | condition result, timeout observation | See [Waiting for page state](#waiting-for-page-state) for matching and timeout handling |
 | `send_keys` | `keys`, optional `repeat`, `focus_emulation` | `{success, dispatched, os}` | e.g. `Enter`, `Escape`, `Mod+A`; acts on the focused element |
 | `mouse_click` | `selector`, optional `focus_emulation` | action result | Real pointer input for a visible element |
 | `click` | `selector` (@e ref or CSS) | `{success, tag, text}` | Synthetic `el.click()` |
@@ -36,13 +36,15 @@ For a reusable website CLI or script, follow the [CLI creation workflow](referen
 | `list_browser_tabs` | — | `{success, tabs:[{tabId, windowId, url, title, active}]}` | Inspect all tabs visible to this WebBridge connection, across windows; does not attach or focus a tab |
 | `attach_tab` | `tabId` | `{success, tabId, url, title, borrowed}` | Attach a specific existing tab to this session without focusing it; borrowed tabs survive `close_session` |
 | `close_tab` | — | `{success, closed: bool}` | Close the current tab only when that is intended; it can close a borrowed tab |
-| `close_session` | — | `{success, closed: int}` | Close tabs opened by this session; borrowed tabs stay open. `closed` is the count. See [Sessions](#sessions) for when to call |
+| `close_session` | optional `mode:"explicit"` (capability required) | `{success, closed: int}` | Close tabs opened by this session; borrowed tabs stay open. `closed` is the count. See [Sessions](#sessions) for when to call |
+| `mark_tab` | `keep:"deliverable"` or `"handoff"`; optional `tabId` | `{success, managed, keep, workId}` | Requires `capabilities.tab_lifecycle:1`; retain a live result or a page waiting for user action |
+| `finish_browser_work` | `workId`; optional `keep_group:true` | `{success, closed, closedTabIds, releasedTabIds, handoffTabIds, failedTabs, remainingTabIds}` | Requires `capabilities.tab_lifecycle:1`; finish this browser segment after recording findings and source URLs |
 
 ### Tabs and the current tab
 
 Single-tab tools (`snapshot`, `click`, `fill`, `screenshot`, `save_as_pdf`) act on the **current tab** — the one you most recently opened with `navigate`, selected with `find_tab`, or attached with `attach_tab`.
 
-- **Opening pages**: use `newTab:true` when pages should coexist (comparing, cross-referencing); omit it to send the current tab to a new URL.
+- **Opening pages**: use `newTab:true` for a new work page. To navigate a particular existing page, use its `tabId` when `/status` reports `tab_id_arg:true`. With lifecycle support, omitted targets create new pages; `newTab:false` reuses a task-created working page. Existing user pages are never implicitly overwritten by the new lifecycle.
 - **Going back to an earlier tab**: `find_tab` searches tabs already in this session by host, ignoring paths (`kimi.com` also matches `www.kimi.com`). For a specific tab among several on the same host, take its `tabId` from `list_tabs` and use `attach_tab` to select it exactly. Reattaching an owned tab preserves its ownership.
 - **Acting on a page the user already has open**: call `list_browser_tabs`, choose the tab by its URL/title and `tabId`, then call `attach_tab` with that ID. This also works for tabs in other windows and does not change the user's foreground tab. The attached tab is borrowed and remains open after `close_session`. For the particular tab the user is currently viewing, `find_tab` with `active:true` still works.
 - If `find_tab` errors with "no tab matching … in this session", the page isn't open in this session — `navigate` with `newTab:true` instead.
@@ -83,9 +85,10 @@ curl.exe -s -X POST http://127.0.0.1:10086/command -H "Content-Type: application
 
 ## Sessions
 
-**One task = one session = one tab group.** A `session` collects every tab the task opens into one tab group, so the user sees a single group for "what the agent is doing right now". Pass it as a **top-level field** of the request body (not inside `args`).
+**One task = one session, at most one working group.** Reading an existing page creates no group. The first new work page creates it; later new pages reuse it. A `session` collects every tab the task opens into one tab group, so the user sees a single group for "what the agent is doing right now". Pass it as a **top-level field** of the request body (not inside `args`).
 
 - **Pick one session name at the task's start, put it on every command, and never switch mid-task — even across different sites.** Switching session names per site is the #1 cause of fragmented tab groups.
+- When invoking platform CLIs within this task, set `KIMI_WEBBRIDGE_SESSION` to the same session name. It overrides platform defaults; nested commands leave cleanup to you. Standalone one-shot commands use their own session and clean only on success when lifecycle support exists.
 - Name it after the **task**, not the site (`camping-research`, `phone-compare`). Use multiple sessions only for genuinely unrelated parallel tasks.
 - `group_title` is the human-readable group label — write it in the user's language, on the **first** `navigate` of the task.
 - Keep startup updates about the user's task; defer tab cleanup decisions to [Task completion](#task-completion), without an opening reminder about closing the group.
@@ -101,15 +104,19 @@ curl -s -X POST http://127.0.0.1:10086/command \
 
 ### Task completion
 
-Treat the task group as the cleanup unit. Follow existing user instructions to keep or close it. A turn ending is not task completion: keep the group while work, login, approval or recovery is still pending.
+Read `/status` at task start and again after a runtime upgrade or reconnect. New lifecycle tools are available only when `capabilities.tab_lifecycle` equals `1` (both daemon and extension support it). Ordinary tools remain available when the capability is absent.
 
-When the task is complete and its verified result is ready to deliver, call `list_tabs` to record the current inventory. Retaining any page in the group means keeping the group:
+With lifecycle support:
 
-- **Temporary task, results captured:** call `close_session` to close the whole task group. Borrowed user tabs are automatically spared; no separate ownership classification is needed.
-- **Pages are the deliverable or still in use:** keep the whole group, including when there is unsaved work or the user has taken over a page. No cleanup question is needed.
-- **Uncertain:** present the result, then ask once whether to close the named task group or keep it. Prefer the host's native choice tool when exposed and permitted for this purpose in the current mode; otherwise ask in plain text. Use concrete options such as “Close task pages” / “Keep pages”. Mention any uncertainty about unsaved work. An unanswered question, dismissal or preselected option means keep; do not repeatedly ask.
+1. Keep the `workId` returned by browser tools for the current segment. All parallel workers share the session, but each must keep its own target tabId and pass it on page operations; the session current-page cursor is not worker-local. Platform CLI browser clients do this automatically. Only the coordinator finishes the segment after every worker has settled. If a CLI returned only business data, call `list_tabs` in that session after all workers settle to obtain the current `workId`.
+2. Record findings and source URLs before finishing research. Use `mark_tab` with `keep:"deliverable"` when the live page is useful to the user (an application, form, editor, or requested page), and `keep:"handoff"` before waiting for login, confirmation, or a manual step. Users need not ask for these technical distinctions.
+3. When research succeeds, call `finish_browser_work` with that segment's `workId`. It closes ordinary task-created pages, preserves existing user pages and handoffs, and releases foreground/deliverable pages from cleanup. Use `keep_group:true` only when the user requests the whole group. A later browser segment gets a new `workId`.
+4. On stop, error, disconnect, or incomplete work, retain pages for recovery. Actual reuse resumes a handoff page; unrelated messages do not consume it.
+5. An explicit user request to close the task's remaining temporary pages uses `close_session` with `mode:"explicit"`. It still excludes existing user pages. To close a specific user page, use `close_tab` only when that action is requested.
 
-For a delayed close answer, refresh `list_tabs`. If the group has gained pages or its use has changed since the question, keep it until the changed scope is resolved. Use `close_session` for group cleanup, not a per-page deletion workflow. Report only the actual `closed` count; if fewer tabs close than expected, check the original IDs with `list_browser_tabs` before claiming all pages closed, since `close_session` clears its ledger even on partial closure.
+Check `success` and `failedTabs`; failed pages remain recorded for retry. A stale work ID closes nothing. Report actual closure counts. Finishing browser work does not end the chat.
+
+Without the capability, keep the existing browser tools usable and leave pages open after ordinary completion. Do not send new lifecycle calls or use legacy `close_session` for automatic cleanup. For an explicit request to close task pages, legacy `close_session` remains available; verify remaining pages with `list_browser_tabs` because older extensions return only a count. Mention an upgrade only when needed to explain unavailable automatic cleanup.
 
 ## Reading pages
 
@@ -121,9 +128,16 @@ Use `read_page({})` for the main document's text; omit `frame`. The main documen
 
 **Embedded documents:** top-page refs and DOM actions do not reach into iframes. Use a `frame` handle from `snapshot.frames` with `read_page`, e.g. `{"frame":"#f1"}`. `wait` with `{"frame":"any"}` waits for a large readable embedded document; use the snapshot for smaller frames. Frame reads must echo `frame` in the response; if absent, the extension is older and returned the top page. Ask the user to update it. Acting inside frames is not supported by these DOM tools; a frame URL may work as a separate page, but authenticated previews often do not.
 
+## Waiting for page state
+
+After an action, wait for an observed condition, e.g. `wait({"selector":".search-result","timeout_ms":10000})`; a duration alone is not a condition. Multiple `text`, `text_gone`, and `selector` conditions use **OR**: any one matching ends the wait.
+
+Text matching is case-insensitive and collapses whitespace. Text and selectors check the main document and open shadow roots, excluding iframe documents. Text matching excludes form-control values and placeholders; use `evaluate` to inspect those. For embedded documents, follow the frame workflow above.
+
+`timeout_ms` defaults to 10000 (range 500–60000) and is shared by the condition wait and its optional `snapshot:true`. On `timedOut:true`, inspect `observation` if present, then use `snapshot` to choose the next step. Extend the deadline only when the page shows continuing progress. If `page_snapshot_error` is returned, keep the condition result and call `snapshot` separately when you need the page state.
+
 ## Browser interaction
 
-- After an action, wait for an observed condition, e.g. `wait({"selector":".search-result","timeout_ms":10000})`; a duration alone is not a condition. Text and selectors check the main page, excluding iframe documents. For embedded documents, follow the frame workflow above. On `timedOut:true`, inspect `observation` if present, then use `snapshot` to choose the next step. Extend the deadline only when the page shows continuing progress.
 - Use `click` / `fill` with observed refs. `fill` replaces existing text; to append, read the current value first and concatenate.
 - For Enter, Escape or shortcuts, use `send_keys`, e.g. `{"keys":"Enter"}`. On background tabs, enable focus emulation (below) before focusing the intended element, send the keys, then disable emulation. Verify the resulting page state: successful dispatch alone does not prove the form submitted. `Mod` selects Cmd on macOS and Ctrl elsewhere; native macOS text inputs may ignore Cmd editing shortcuts, so use `fill` for text replacement.
 - When a site requires real pointer events, use `mouse_click` with the observed selector and `focus_emulation:true` for a background tab. Login, CAPTCHA or other human-only gates may still require the user.
@@ -132,9 +146,11 @@ Use `read_page({})` for the main document's text; omit `frame`. The main documen
 
 ## Screenshots and PDF export
 
-`screenshot` and `save_as_pdf` return a local `path`, not base64. Open screenshots with the host's available image-viewing tool. An explicit `path` overwrites an existing file, so choose a unique output path.
+`screenshot` and `save_as_pdf` return a local `path`, not base64. Open screenshots at the returned `path` with the host's available image-viewing tool. An explicit `path` overwrites an existing file, so choose a unique output path.
 
 For `screenshot`, omit options for a PNG viewport capture; use `selector` for one element, or `format:"jpeg"` and `quality` for JPEG.
+
+`screenshot` relative paths use the default screenshot directory. Across daemon versions, omit `path` or use an absolute path.
 
 For `save_as_pdf`, optional arguments are `paper_format` (`letter` default, `a4`, `legal`, `a3`, `tabloid`), `landscape` (default false), `scale` (0.1–2, default 1), `print_background` (default true), and `path`. The daemon rejects PDFs larger than 100 MB; reduce the output or split the page.
 
